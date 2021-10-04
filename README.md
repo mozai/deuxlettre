@@ -1,4 +1,4 @@
-DeaxLettre
+DeuxLettre
 ==========
 The idea is a report (chart?) of all the two-letter internet domain names.
 A-Z in columns, A-Z in rows.  Icon for each, with maybe a clickthrough
