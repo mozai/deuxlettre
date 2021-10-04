@@ -9,7 +9,6 @@ last update 2021-10-04
 
 Howto
 -----
-    mkdir -p ico; rm ico/*
     ./gather_records.sh >gathered.tsv
     ./gather_icons.sh gathered.tsv
     ./make_html.sh gathered.tsv >index.html  
