@@ -26,22 +26,16 @@ check_requirements(){
   else
     die "I need one of dig, drill, nslookup or (BIND9) host!"
   fi
-  if command -v wget >/dev/null 2>/dev/null; then
-    # wget --timeout doesn't work, because some http sites are tarbabies
-    http_get(){ 
-      { timeout 5 wget -qO- "https://$1" 2>/dev/null && PROT=https; } \
-      || \
-      { timeout 5 wget -qO- "http://$1" 2>/dev/null && PROT=http; }
-    }
-  elif command -v curl >/dev/null; then
+  # can't use wget because it doesn't tell me the final relocated URL
+  if command -v curl >/dev/null; then
     # curl --max-time doesn't work, because some sites are tarbabies
     http_get(){ 
-      { timeout 5 curl -L -s "https://$1" 2>/dev/null && PROT=https; } \
+      { timeout 5 curl -L -s "https://$1" -w '\n<x-url-effective>%{url_effective}</x-url-effective><foobar/>\n' 2>/dev/null; } \
       || \
-      { timeout 5 curl -L -s "http://$1" 2>/dev/null && PROT=http; }
+      { timeout 5 curl -L -s "http://$1"  -w '\n<x-url-effective>%{url_effective}</x-url-effective><foobar/>\n' 2>/dev/null; }
     }
   else
-    die "I need one of wget or curl!"
+    die "I need curl!"
   fi
   if ! command -v xargs >/dev/null; then
     die "I need xargs!"
@@ -51,11 +45,12 @@ check_requirements(){
 get_stuff(){
   # $1 = hostname
   h=$1;
+  errors="";
 
   # DNS stuff
   for i in "${DNSTYPES[@]}"; do
     i=${i^^}
-    res=$(dns_get2 "$h" "$i")
+    res=$(dns_get2 "$h" "$i") || errors+=" DNS-$i fail"
     while read -r line; do
       [ -n "$line" ] && echo -e "$h\t$i\t$line" && break
     done < <(sort <<<"$res")
@@ -64,10 +59,9 @@ get_stuff(){
   # HTTP/HTML stuff
   # well at least I'm not using regexps to parse HTML
   # ... not entire parts of HTML *cough*
-  local body h iconurl tag title rel href found
+  local body h iconurl tag title rel href found url
   h=$1
   local IFS=\>
-  PROT=""
   while read -r -d \< tag body; do
     found=1
     [[ "$tag" =~ ^/ ]] && continue
@@ -80,6 +74,8 @@ get_stuff(){
     body=$(unset IFS; echo $body)  # cheap way to flatten whitespace
     if [[ "${tag^^}" =~ ^TITLE ]]; then
       title=$(<<<"$body" tr -d '\r')
+    elif [[ "${tag^^}" =~ ^X-URL-EFFECTIVE ]]; then
+      url=$(<<<"$body" tr -d '\r')
     elif [[ "${tag^^}" =~ ^LINK ]]; then
       #eval local ${tag#* }  # I hated this, and it broke on attribs like "data-n-g="
       rel=$(sed -r '{s/.*[[:space:]]rel="([^"]*)".*/\1/;s/.*[[:space:]]rel='"'"'([^'"'"']*)'"'"'.*/\1/;s/.*[[:space:]]rel=([^[:space:]]*).*/\1/;}' <<<"$tag")
@@ -96,15 +92,22 @@ get_stuff(){
         fi
       fi
     fi
-    [[ "${tag^^}" =~ "BODY" ]] && break;
   done < <(http_get "$h" || http_get "www.$h")
   if [ -n "$found" ]; then
-    echo -e "$h\tTITLE\t${title:- }"  # blank means "found a website but no <title>"
     if [[ "$iconurl" =~ ^/[^/] ]]; then
       iconurl="//${h%.}$iconurl"
     fi
     [ -n "$iconurl" ] && echo -e "$h\tICON\t$iconurl"
+    [ -n "$title" ] && echo -e "$h\tTITLE\t$title"
+    if [ -n "$url" ]; then
+      url=$(sed -r 's/\.\//\//;s/\?.*//' <<<"$url")
+      echo -e "$h\tURL\t$url"
+    else
+      # errors+=" HTTP no x-url-effective tag"
+      : pass
+    fi
   fi
+  [ -n "$errors" ] && echo -e "$h\tERRORS\t$errors"
 }
 
 list_targets(){
@@ -118,8 +121,11 @@ list_targets(){
 }
 
 #list_targets(){
+#  # shorter list for testing
+#  echo "aa.com.";  # "access denied" for curl
+#  echo "wy.com.";  # misisng the URL record
 #  # just some problems to fix by iteration
-#  echo "qb.com."; echo "xo.com."; echo "oj.com.";
+#  #echo "qb.com."; echo "xo.com."; echo "oj.com.";
 #}
 
 ####################

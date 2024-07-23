@@ -15,14 +15,16 @@ OUTDIR="./ico"
 die(){ echo >&2 "$*"; exit 1; }
 
 check_requirements(){
-  if command -v wget >/dev/null 2>/dev/null; then
-    # wget --timeout doesn't work, because some http sites are tarbabies
-    http_get(){ local u=$1; u=${u#*//}; timeout 5 wget -qO- "https://$u" 2>/dev/null || timeout 5 wget -qO- "http://$u" 2>/dev/null; }
-  elif command -v curl >/dev/null; then
+  if command -v curl >/dev/null; then
     # curl --max-time doesn't work, because some sites are tarbabies
-    http_get(){ local u=$1; u=${u#*//}; timeout 5 curl -L -s "https://$u" 2>/dev/null || timeout 5 curl -L -s "http://$u" 2>/dev/null; }
+    http_get(){
+      local u=$1;
+      u=${u#*//};
+      timeout 5 curl -L -s "https://$u" 2>/dev/null \
+      || timeout 5 curl -L -s "http://$u" 2>/dev/null;
+    }
   else
-    die "I need one of wget or curl!"
+    die "I need one curl!"
   fi
   if ! command -v xargs >/dev/null; then
     die "I need xargs!"
@@ -41,9 +43,9 @@ get_icon_urls() {
   declare -A iconurls
   while read -r line; do
     IFS=$'\t' read -r h rtype body <<<"$line"
-    if [ "$rtype" == "TITLE" ]; then
+    if [ "$rtype" == "URL" ]; then
       if [ -z "${iconurls[$h]}" ]; then
-        iconurls[$h]="https://${h%.}/favicon.ico"
+        iconurls[$h]="${body%/*}/favicon.ico"
       fi
     elif [ "$rtype" == "ICON" ]; then
       iconurls[$h]=$body

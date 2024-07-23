@@ -11,50 +11,6 @@ ICODIR="./ico"
 ICODNE="./ico/null-0.gif"  # does not exist
 ICO_NA="./ico/null-1.gif"  # not available
 
-cat <<'_EOD'
-<!doctype html>
-<head>
-<meta charset="UTF-8">
-<title>deuxlettre</title>
-<style>
-  html,body {
-    background:#ddd;
-    font-size:10.5pt;
-    font-family:serif;
-    text-align:center;
-  }
-  table { border-collapse:collapse; margin:auto; }
-  .tt {position:relative; display:inline-block;}
-  .tt .ttt {
-    background-color:#333;
-    border-radius:4px;
-    bottom:125%;
-    color:white;
-    left:50%;
-    margin-left:-10em;
-    opacity:0;
-    padding:2px;
-    position:absolute;
-    text-align:center;
-    text-align:left;
-    transition:opacity 0.3s;
-    visibility:hidden;
-    width:20em;
-    z-index:1;
-  }
-  .tt:hover .ttt { visibility:visible; opacity:1; }
-  h1 { text-align:center; }
-  table td img { height: 16px; width: 16px; }
-  table td { height: 24px; width: 24px; text-align:center; }
-  #footer { text-align:center; margin:auto; padding-bottom:5em; }
-  #footer ul { margin:auto; width:30em; text-align:left; }
-</style>
-</head><body>
-<div id=header>
-<h1>DeuxLettre</h1>
-<p>What two-letter domain names are owned/ available?</p>
-</div>
-_EOD
 
 declare -A database
 slurp_database(){
@@ -67,13 +23,41 @@ slurp_database(){
 }
 if [ $# == 1 ] && [ -e "$1" ]; then
   slurp_database "$1"
+  mtime=$(stat gathered.tsv -c %y)
+  mtime=${mtime%.*}
 else
   echo >&2 "Usage: $0 output-of-gather.tsv"
   exit 1
 fi
 
+cat <<'_EOD'
+<!doctype html>
+<head>
+<meta charset="UTF-8">
+<title>deuxlettre</title>
+<style>
+  html,body { background:#ddd; font-size:10.5pt; font-family:serif; text-align:center; }
+  table { border-collapse:collapse; margin:auto; }
+  h1 { text-align:center; }
+  table td img { height: 16px; width: 16px; }
+  table td { height: 24px; width: 24px; text-align:center; }
+  #footer { text-align:center; margin:auto; padding-bottom:5em; }
+  #footer ul { margin:auto; width:30em; text-align:left; }
+tr.tt td div { display:inline-block; position:relative; }
+  tr.tt td div span { background-color:#333; border-radius:4px; color:white; left:50%; margin-left:-10em; opacity:0; padding:2px; position:absolute; text-align:center; text-align:left; transition:opacity 0.3s; visibility:hidden; width:20em; z-index:1; }
+  tr.tt-above td div span { bottom: 125%; }
+  tr.tt-below td div span { top: 125%; }
+  tr.tt td div:hover span { opacity:1; visibility:visible; }
+</style>
+</head><body>
+<div id=header>
+<h1>DeuxLettre</h1>
+<p>What two-letter domain names are owned/ available?</p>
+</div>
+_EOD
+
 echo "<table>"
-echo -n "<tr><th>.${SUFFIX}</th>"
+echo -n "<tr class=tt><th>.${SUFFIX}</th>"
 for i in {a..z}; do echo -n "<th>$i</th>"; done
 echo "</tr>"
 
@@ -81,8 +65,8 @@ spew_td(){
   local h tooltiptext j i iconurl
   h="$1"
   if [ -z "${database["${h}."]}" ]; then
-    echo -n "<td><div class=tt><img alt=\"$h\" src=\"$ICODNE\">"
-    echo -n "<span class=ttt><b>$h</b><ul><li>No DNS records found</li></ul></span>"
+    echo -n "<td><div><img alt=\"$h\" src=\"$ICODNE\">"
+    echo -n "<span><b>$h</b><ul><li>No DNS records found</li></ul></span>"
     echo "</td>"
     return
   fi
@@ -104,7 +88,7 @@ spew_td(){
     fi
   done
   iconurl=${iconurl:-$ICO_NA}
-  echo -n "<td><div class=tt>"
+  echo -n "<td><div>"
   if [ -n "${database["${h}.|TITLE"]}" ]; then
     echo -n "<a target=_blank href=\"http://${h}\">"
   fi
@@ -112,12 +96,19 @@ spew_td(){
   if [ -n "${database["${h}.|TITLE"]}" ]; then
     echo -n "</a>"
   fi
-  echo -n "<span class=ttt>$tooltiptext</span></div>"
+  echo -n "<span>$tooltiptext</span></div>"
   echo "</td>"
 }
 
-for i in {a..z}; do
-  echo "<tr><th>$i</th>"
+for i in {a..m}; do
+  echo "<tr class=\"tt tt-below\"><th>$i</th>"
+  for j in {a..z}; do
+    spew_td "${i}${j}.${SUFFIX}"
+  done
+  echo "</tr>"
+done
+for i in {n..z}; do
+  echo "<tr class=\"tt tt-above\"><th>$i</th>"
   for j in {a..z}; do
     spew_td "${i}${j}.${SUFFIX}"
   done
@@ -126,15 +117,11 @@ done
 
 echo "</table>"
 
-cat <<'_EOD'
+cat <<_EOD
 <div id=footer>
 <p>Made in bash one weekend when I was sick. - Moses "Mozai" Moore -</p>
-<p>TODO list:<ul>
-  <li>detect if I should link to https or http, dont just guess https</li>
-  <li>better "icon not available" icon</li>
-  <li>tooltip sometimes renders out of the viewable window</li>
-  <li>some domain-names are owned by have zero DNS records;  but WHOIS lookups are throttled to asphyxiation</li>
-  <li>try to detect squatters, indicate them in the icons</li>
-</ul></p>
+<p>Last updated: ${mtime}</p>
+<p>TODO list moved to readme file.</p>
 </div>
+</body>
 _EOD
