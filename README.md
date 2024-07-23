@@ -5,7 +5,6 @@ A-Z in columns, A-Z in rows.  Icon for each, with maybe a clickthrough
 to info or a tooltip.
 
 Author: Mozai.
-Last update: 2021-10-04
 
 
 Howto
@@ -40,7 +39,7 @@ Todo
 * tabbed UI for com. net. and org. not just com.
 * summary table of interesting facts like:
   * %age of unknowned
-  # %age of owned but no http server
+  * %age of owned but no http server
   * top X owners of multiple domain names
   * top X common SOA/NS/A/AAAA/MX records
 * some domain-names are owned by have zero DNS records;
